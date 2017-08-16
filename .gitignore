@@ -1,0 +1,14 @@
+# System
+.DS_Store
+*.swp
+
+# R
+*.Rhistory
+*.Rapp.history
+
+# Python 3
+__pycache__/
+*.ipynb_checkpoints/
+
+# Data
+*.csv
