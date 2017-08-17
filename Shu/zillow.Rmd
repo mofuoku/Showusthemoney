@@ -1,0 +1,185 @@
+---
+title: "Zillow Project"
+author: "Shu Zhang"
+date: "8/15/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, message=FALSE}
+library(ggplot2)
+library(GGally)
+library(dplyr)
+library(VIM)
+library(mice)
+library(Hmisc)
+library(kknn)
+```
+
+
+
+## II. Import Data
+
+
+```{r train}
+train <- read.csv('train_2016_v2.csv',header = TRUE, stringsAsFactors = FALSE)
+properties <- read.csv('properties_2016.csv', header = TRUE, stringsAsFactors = FALSE)
+sample <- read.csv('sample_submission.csv',header = TRUE, stringsAsFactors = FALSE)
+```
+
+## III. Structure of the Data
+### A. Training Set
+
+
+```{r pressure, echo=FALSE}
+dim(train) # 90275 obs., 3 variables
+head(train,5)
+```
+### Properties Set
+```{r properties}
+dim(properties) # 2985217 obs., 58 variables
+head(properties,5)
+```
+### Sample Set
+```{r}
+dim(sample) # 2985217 obs., 7 variables
+head(sample,5)
+colnames(sample) <- tolower(colnames(sample))
+sum(complete.cases(sample)) # no missing values
+```
+## Join Sample and Properties into "Original"" Dataset
+```{r}
+sum(complete.cases(properties$parcelid)) # no missing values on parcelid column
+original <- merge(x = sample, y = properties,by = "parcelid")
+
+```
+
+## Visualization for the missing data.
+
+```{r}
+# aggr(original)
+
+```
+
+
+## Summarize the missing values in the data.
+
+The visualization of missingness of the data indicates that there are columns which have a huge number of missing values. 
+
+```{r missingValues}
+total <- NULL
+percent <- NULL
+for (i in 1:length(colnames(original))) {
+  total[i] <- sum(is.na(original[,i]))
+  percent[i] <- round(total[i]/nrow(original),4)
+}
+
+missingValues <- data.frame(variables=colnames(original),total=total, percent=percent)
+missingValues
+```
+There are 29 out of 64 columns having more than 15% missing values.
+```{r}
+sum(missingValues[,"percent"] > 0.15)
+
+```
+Let's analyse this to understand how to handle the missing data.
+
+
+We'll consider that when more than 15% of the data is missing, we should delete the corresponding variable. This means that we will not try to impute the missing data in these cases. The more missing data a variable has, the less important it will be among all the housing features, since most of them are not aspects in which we think about when buying a house (maybe that's the reason why data is missing?). According to this, there is a set of variables (e.g. 'basementsqft', 'poolsizesum', 'finishedsquarefeet13', etc.) that we should delete. The majority of columns to be deleted have more than 80 percent of missing data. "basementsqft", "storytypeid", "yardbuildingsqft26",etc have almost 100% of missing values, so we are safe to delete them.
+
+
+Moreover, looking closer at the variables, we could say that variables like 'PoolQC', 'MiscFeature' and 'FireplaceQu' are strong candidates for outliers, so we'll be happy to delete them.
+In what concerns the remaining cases, we can see that 'GarageX' variables have the same number of missing data. I bet missing data refers to the same set of observations 
+```{r}
+deleteVariables <- missingValues %>% filter(percent > 0.15) %>%
+  arrange(desc(percent))
+head(deleteVariables)
+
+```
+
+```{r}
+write.csv(deleteVariables,"deletedVariables.csv")
+```
+
+### Delete these variables that having too many missing values.
+```{r}
+# need_col contains only the undelete variables
+needed_col <- colnames(original)[!(colnames(original) %in% deleteVariables$variables)]
+
+
+original_clean <- original %>%
+  select(one_of(needed_col))
+dim(original_clean) # The dataset after reducing the missing-value columns has 35 variables.
+```
+### Remove rows having more than 60% of missing values.
+If an observation has missing records over 80% out of all house features, we will consider it as a "bad observation" due to lack of information. We will delete those rows.
+
+```{r}
+dim(original_clean)
+h <- original_clean[rowSums(is.na(original_clean)) < ncol(original_clean)*0.6, ]
+dim(original_clean)[1] - dim(h)[1] # We need to remove 11437 rows.
+sum(is.na(original_clean$bathroomcnt)) 
+ 
+
+```
+The number of missing values in bathroomcnt column is 11462. We found that it is almost equal to the number of rows having more than 60% of missing values (11437 rows).
+
+
+
+```{r}
+original_clean <- h
+```
+
+
+
+### Data Cleaning
+We will clean data column by column.
+```{r}
+dim(original_clean) # 2973780 obs, 35 cols
+names(original_clean)
+```
+### Imputation 
+(to be continued..)
+
+
+
+bathroomcnt, bedroomcnt,  (MAR) 
+
+Mean value imputation
+```{r}
+imputed.bathroomcnt <- impute(original_clean$bathroomcnt, mean)
+original_clean$bathroomcnt <- imputed.bathroomcnt
+
+imputed.bedroomcnt <- impute(original_clean$bedroomcnt, mean)
+original_clean$bedroomcnt <- imputed.bedroomcnt
+
+sum(is.na(original_clean$calculatedfinishedsquarefeet))
+```
+calculatedfinishedsquarefeet 
+
+It has a normal distribution, so it is not 'MNAR', but it is related the number of bathrooms or total sqft. We can impute missing values KNN.
+```{r}
+hist(log(original_clean$calculatedfinishedsquarefeet))
+```
+
+```{r}
+plot(original_clean$bathroomcnt,log(original_clean$calculatedfinishedsquarefeet))
+```
+
+```{r}
+tds <- kknn(calculatedfinishedsquarefeet~., original_clean,original_clean[,-"calculatedfinishedsquarefeet"],k=10,distance=2)
+```
+
+
+
+
+Concern: calculatedbathnbr = bathroomcnt ??
+We can't simply do mean value imputation, 117475 of missing values. Can we use bathroomcnt only? Do they represent the same thing??
+```{r}
+
+```
+
