@@ -92,8 +92,8 @@ Let's analyse this to understand how to handle the missing data.
 We'll consider that when more than 15% of the data is missing, we should delete the corresponding variable. This means that we will not try to impute the missing data in these cases. The more missing data a variable has, the less important it will be among all the housing features, since most of them are not aspects in which we think about when buying a house (maybe that's the reason why data is missing?). According to this, there is a set of variables (e.g. 'basementsqft', 'poolsizesum', 'finishedsquarefeet13', etc.) that we should delete. The majority of columns to be deleted have more than 80 percent of missing data. "basementsqft", "storytypeid", "yardbuildingsqft26",etc have almost 100% of missing values, so we are safe to delete them.
 
 
-Moreover, looking closer at the variables, we could say that variables like 'PoolQC', 'MiscFeature' and 'FireplaceQu' are strong candidates for outliers, so we'll be happy to delete them.
-In what concerns the remaining cases, we can see that 'GarageX' variables have the same number of missing data. I bet missing data refers to the same set of observations 
+Moreover, looking closer at the variables, we could say that 
+
 ```{r}
 deleteVariables <- missingValues %>% filter(percent > 0.15) %>%
   arrange(desc(percent))
