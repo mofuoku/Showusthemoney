@@ -40,7 +40,7 @@ sample <- read.csv('sample_submission.csv',header = TRUE, stringsAsFactors = FAL
 
 ### Sample Set
 ```{r}
-dim(sample) # 2985217 obs., 7 variables
+dim(train) # 2985217 obs., 7 variables
 head(sample,5)
 colnames(sample) <- tolower(colnames(sample))
 sum(complete.cases(sample)) # no missing values
@@ -64,13 +64,7 @@ ggplot(data=date_ds, aes(x=year_month,y=count)) +
 
 ##  Missingness
 
-```{r}
-# aggr(original)
-
-```
-
-
-## Summarize the missing values in the data.
+### Summarize the missing values in the data.
 
 ```{r missingValues}
 total <- NULL
@@ -90,9 +84,10 @@ The visualization of missingness of the data indicates that there are columns wh
 
 ```{r}
 ggplot(missingValues, aes(reorder(x=variables,-percent),y=percent)) +
-  geom_bar(stat="identity",fill="tomato1")+
+  geom_bar(stat="identity",fill="tomato2")+
   coord_flip()+
-  theme_tufte()
+  theme_tufte()+
+  labs(title="Number of missing values in each column")
   
 ```
 
@@ -131,6 +126,21 @@ properties_clean <- properties %>%
   select(one_of(needed_col))
 dim(properties_clean) # The dataset after reducing the missing-value columns has 29 variables.
 ```
+### Delete columns that are duplicated with other columns.
+'calculatedbathnbr' = 'bathroomcnt' <br />
+'fips' = 'regionidcounty'<br />
+'calculatedfinishedsquarefeet' = 'finishedsquarefeet12'<br />
+'fullbathcnt' = 'bathroomcnt'
+
+```{r}
+names(properties_clean)
+col_drop <- c("fips","calculatedbathnbr","finishedsquarefeet12","fullbathcnt")
+cl = properties_clean[ ,-which(colnames(properties_clean) %in% col_drop)]
+properties_clean <- cl
+
+```
+
+
 ### Remove rows having more than 60% of missing values.
 If an observation has missing records over 80% out of all house features, we will consider it as a "bad observation" due to lack of information. We will delete those rows.
 
@@ -153,7 +163,7 @@ properties_clean <- h
 ### Data Cleaning
 We will clean data column by column.
 ```{r}
-dim(properties_clean) # 2973780 obs, 29 cols
+dim(properties_clean) # 2973780 obs, 26 cols
 names(properties_clean)
 ```
 ### Imputation 
@@ -171,7 +181,9 @@ properties_clean$bathroomcnt <- imputed.bathroomcnt
 imputed.bedroomcnt <- impute(properties_clean$bedroomcnt, mean)
 properties_clean$bedroomcnt <- imputed.bedroomcnt
 
-sum(is.na(original_clean$calculatedfinishedsquarefeet))
+
+summary(properties_clean)
+sum(is.na(properties_clean$calculatedfinishedsquarefeet))
 ```
 calculatedfinishedsquarefeet 
 
@@ -190,9 +202,6 @@ plot(original_clean$bathroomcnt,log(original_clean$calculatedfinishedsquarefeet)
 
 
 
-
-Concern: calculatedbathnbr = bathroomcnt ??
-We can't simply do mean value imputation, 117475 of missing values. Can we use bathroomcnt only? Do they represent the same thing??
 ```{r}
 write.csv(original_clean,'zillow_clean.csv')
 ```
