@@ -105,7 +105,7 @@ head(deleteVariables)
 write.csv(deleteVariables,"deletedVariables.csv")
 ```
 
-### Delete these variables that having too many missing values.
+### Delete columns that having a large percentage of missing values.
 ```{r}
 # need_col contains only the undelete variables
 needed_col <- colnames(original)[!(colnames(original) %in% deleteVariables$variables)]
