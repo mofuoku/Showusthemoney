@@ -20,6 +20,7 @@ library(Hmisc)
 library(kknn)
 library(lubridate)
 library(ggthemes)
+library(data.table)
 ```
 
 
@@ -55,8 +56,8 @@ date_ds <- date %>%
   summarise(count = n())
 
 ggplot(data=date_ds, aes(x=year_month,y=count)) +
-  geom_bar(stat="identity",fill="tomato1") +
-  theme_gdocs()+
+  geom_bar(stat="identity",fill="purple1") +
+  theme_hc()+
   labs(x="Time", y="Number of Transactions",
        title = "Transaction vs Month")
 
@@ -75,7 +76,8 @@ for (i in 1:length(colnames(properties))) {
 }
 
 missingValues <- data.frame(variables=colnames(properties),total=total, percent=percent)
-missingValues
+missingValues <- missingValues %>% filter(percent > 0)
+# missingValues
 ```
 
 
@@ -84,10 +86,10 @@ The visualization of missingness of the data indicates that there are columns wh
 
 ```{r}
 ggplot(missingValues, aes(reorder(x=variables,-percent),y=percent)) +
-  geom_bar(stat="identity",fill="tomato2")+
-  coord_flip()+
+  geom_bar(stat="identity",fill="orangered1")+
   theme_tufte()+
-  labs(title="Number of missing values in each column")
+  labs(title="Number of missing values in each column")+
+  theme(axis.text.x=element_text(angle=90, hjust=1))
   
 ```
 
@@ -181,9 +183,7 @@ properties_clean$bathroomcnt <- imputed.bathroomcnt
 imputed.bedroomcnt <- impute(properties_clean$bedroomcnt, mean)
 properties_clean$bedroomcnt <- imputed.bedroomcnt
 
-
-summary(properties_clean)
-sum(is.na(properties_clean$calculatedfinishedsquarefeet))
+# sum(is.na(properties_clean$calculatedfinishedsquarefeet))
 ```
 calculatedfinishedsquarefeet 
 
@@ -193,7 +193,7 @@ hist(log(original_clean$calculatedfinishedsquarefeet))
 ```
 
 ```{r}
-plot(original_clean$bathroomcnt,log(original_clean$calculatedfinishedsquarefeet))
+plot(properties_clean$bathroomcnt,log(properties_clean$calculatedfinishedsquarefeet))
 ```
 
 ```{r}
@@ -201,8 +201,44 @@ plot(original_clean$bathroomcnt,log(original_clean$calculatedfinishedsquarefeet)
 ```
 
 
+### Join Train and Properties
+Next, let’s join the two tables together on the parcelid column such that we only include properties that have a response value (logerror) in train.
+```{r}
+train_set <- left_join(date, properties_clean, by = c("parcelid"="parcelid"))
+dim(train_set) # 90275 obs., 28 variables
+```
+### Make transactiondate column as month object
+### Delete parcelid col
+```{r}
+month = month(train_set$year_month)
+train_set$transactiondate <- month
+train_set <- train_set[,-c(4,1)]
+setnames(train_set, old=c("transactiondate"), new=c("month"))
+```
+### Dummy Variable Cols
+We will map "true"/"false","Y"/"N" variables into 0/1's.
 
 ```{r}
-write.csv(original_clean,'zillow_clean.csv')
+train_set$hashottuborspa <- ifelse(train_set$hashottuborspa == "",0,1)
+train_set$fireplaceflag <- ifelse(train_set$fireplaceflag == "",0,1)
+train_set$taxdelinquencyflag <- ifelse(train_set$taxdelinquencyflag == "",0,1)
 ```
+
+
+```{r}
+write.csv(train_set,"train_set.csv",row.names=FALSE)
+train_set <- read.csv('train_set.csv',header = TRUE, stringsAsFactors = FALSE)
+```
+
+
+
+
+### EDA
+```{r}
+train_set <- na.omit(train_set)
+summary(train_set)
+hist(log(train_set$lotsizesquarefeet))
+```
+
+
 
