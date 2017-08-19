@@ -1,7 +1,10 @@
 #######################################################################
 ######################### Data Analysis File ##########################
 #######################################################################
-
+library(tidyr)
+library(dplyr)
+library(data.table)
+library(flexclust)
 #######################################################################
 ### Load "train_set.csv" file: 
 ### Select only numeric & integer columns for the simple linear regression rest
@@ -15,73 +18,43 @@ names(train_data)
 View(train_data)
 summary(train_data)
 
+#######################################################################
 ### Exclude the column name "propertyzoningdesc" & "propertycountylandusecode" 
 ### since they are the only non-numeric columns. 
+### Let numeric columns selected dataset be "01" and the interger "02
 
 dim(train_data)
 ### [1] 90275    26
 
+train_data[is.na(train_data)] <- 0 
+
+train_data$bathroomcnt=as.integer(train_data$bathroomcnt)
+train_data$calculatedfinishedsquarefeet=as.numeric(train_data$calculatedfinishedsquarefeet)
+train_data$rawcensustractandblock=as.integer(train_data$rawcensustractandblock)
+train_data$censustractandblock=as.integer(train_data$censustractandblock)
+
 train_data01<-train_data[, sapply(train_data, class)=="numeric"]
 names(train_data01)
 
-###--------------------------------------------------------------------
-### [1] "logerror"                   "bathroomcnt"                "lotsizesquarefeet"         
-### [4] "rawcensustractandblock"     "structuretaxvaluedollarcnt" "taxvaluedollarcnt"         
-### [7] "landtaxvaluedollarcnt"      "taxamount"                  "censustractandblock" 
-###--------------------------------------------------------------------
-
-dim(train_data01)
-###--------------------------------------------------------------------
-### [1] 90275     9
-###--------------------------------------------------------------------
 
 train_data02<-train_data[, sapply(train_data, class)=="integer"]
-names(train_data02)
-###--------------------------------------------------------------------
-### [1] "month"                        "bedroomcnt"                  
-### [3] "calculatedfinishedsquarefeet" "hashottuborspa"              
-### [5] "latitude"                     "longitude"                   
-### [7] "propertylandusetypeid"        "regionidcity"                
-### [9] "regionidcounty"               "regionidzip"                 
-### [11] "roomcnt"                      "yearbuilt"                   
-### [13] "fireplaceflag"                "assessmentyear"              
-### [15] "taxdelinquencyflag"   
-###--------------------------------------------------------------------
+
 
 dim(train_data02)
-
 ### [1] 90275    15
+summary(train_data02)
+### "assessmentyear" column can be deleted since it is all assessed in year 
+### 2015. Intead of deleting here, I will delete the column after scaling. 
+View(train_data02)
 summary(train_data01)
+#######################################################################
 
-train_data03<-cbind(train_data01,train_data02)
 
-train_data03[is.na(train_data03)] <- 0 
-
-new_train_data.scaled = as.data.frame(scale(train_data03))
-sapply(new_train_data.scaled, sd)
-
-write.csv(new_train_data.scaled, file="new_scaled_train_data.csv")
-
-train_data03[is.na(train_data01)] <- 0 
-
-View(train_data01)
-library(flexclust)
-
-sapply(train_data01, sd)
-###---------------------------------------------------
-###     logerror                bathroomcnt          lotsizesquarefeet 
-### 1.610788e-01               1.004271e+00               1.150426e+05 
-###    rawcensustractandblock structuretaxvaluedollarcnt          taxvaluedollarcnt 
-###              2.050549e+05               2.090147e+05               5.548834e+05 
-###  landtaxvaluedollarcnt                  taxamount        censustractandblock 
-###           4.004943e+05               6.838824e+03               4.939707e+12 
-###---------------------------------------------------
-
-train_data.scaled = as.data.frame(scale(train_data01))
-View(train_data.scaled)
+#######################################################################
+### Scale columns of 01 dataset
+train_data01.scaled = as.data.frame(scale(train_data01))
 summary(train_data.scaled)
-
-sapply(train_data.scaled, sd)
+sapply(train_data01.scaled, sd)
 ###---------------------------------------------------
 ### logerror                bathroomcnt          lotsizesquarefeet 
 ###        1                          1                          1 
@@ -91,27 +64,42 @@ sapply(train_data.scaled, sd)
 ###                        1                          1                          1 
 ###---------------------------------------------------
 
-train_data.scaled01 <- train_data.scaled[1:100,]
+###----------Dataset assessmentyear column-----------------------------
+train_data02_1<-train_data02[, !names(train_data02) %in% c("assessmentyear")]
+###----------Combine the price column "logerror" to 02-----------------
+train_data_logerror.scaled <- train_data01.scaled %>% select(logerror)
+train_data02_final<-cbind(train_data_logerror.scaled,train_data02_1)
 
 
-plot(train_data.scaled01, col="blue", main="First 100 Rows: Matrix Scatterplot of Conditions")
+#######################################################################
+### Combining numeric and integer files for future reference.
+### Scaled and save it as "new_scaled_train_data.csv" 
+###----------Dataset assessmentyear column-----------------------------
+##train_data02_final<-cbind(train_data_logerror.scaled,train_data02_01)
+train_data03<-cbind(train_data01.scaled,train_data02_final)
+train_data04<-train_data03[,-c(11)]
+write.csv(train_data04, file="new_scaled_train_data_01.csv")
+#######################################################################
 
-model01=lm(logerror ~ bathroomcnt+lotsizesquarefeet+rawcensustractandblock+structuretaxvaluedollarcnt+
-             taxvaluedollarcnt+landtaxvaluedollarcnt+taxamount+censustractandblock , data = train_data.scaled)
-summary(model01)
+
+train_data.scaled01 <- train_data01.scaled[1:10000,]
+train_data.scaled02 <- train_data02_final.scaled[1:10000,]
+
+plot(train_data.scaled01, col="blue", main="First 100K Rows: Matrix Scatterplot of Conditions")
+plot(train_data.scaled02, col="blue", main="First 100 Rows: Matrix Scatterplot of Conditions")
+
+
+model01=lm(logerror ~ ., data = train_data.scaled01)
+model02=lm(logerror ~ bathroomcnt, data = train_data.scaled01)
+summary(model02)
+
+plot(train_data.scaled01[,1], train_data.scaled01[,9])
+abline(model01)
+
+View(train_data03)
+
 
 ### Small LINEAR REGRESSION TEST ###
-
-
-
-View(train_data.scaled01)
-summary(train_data.scaled01)
-sapply(train_data.scaled01, sd)
-names(train_data.scaled01)
-
-plot(train_data.scaled, col="blue", main="Matrix Scatterplot of Conditions")
-
-model01=lm(logerror ~ bathroomcnt, data = train_data.scaled)
 
 wssplot = function(data, nc = 15, seed = 0) {
   wss = (nrow(data) - 1) * sum(apply(data, 2, var))
