@@ -1,0 +1,96 @@
+---
+title: "zillow_model"
+author: "Shu Zhang"
+date: "8/19/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, message=FALSE}
+library(randomForest)
+```
+
+### Import clean dataset
+
+```{r }
+train_set_scale <- read.csv('new_scaled_train_data_01.csv',header = T,stringsAsFactors = FALSE)
+```
+
+
+### Just for checking (Please ignore it)
+```{r}
+properties <- read.csv('properties_2016.csv', header = TRUE, stringsAsFactors = FALSE)
+train <- read.csv('train_2016_v2.csv',header = TRUE, stringsAsFactors = FALSE)
+date <- train %>% mutate(year_month = make_date(year = year(transactiondate),month=month(transactiondate)))
+
+train_set <- left_join(date, properties, by = c("parcelid"="parcelid"))
+
+col_drop <- c("fips","calculatedbathnbr","finishedsquarefeet12","fullbathcnt")
+cl = train_set[ ,-which(colnames(train_set) %in% col_drop)]
+train_set <- cl
+
+
+total <- NULL
+percent <- NULL
+for (i in 1:length(names(train_set))) {
+  total[i] <- sum(is.na(train_set[,i]))
+  percent[i] <- round(total[i]/nrow(train_set),4)
+}
+
+missingValues <- data.frame(variables=colnames(train_set),total=total, percent=percent)
+missingValues <- missingValues %>% filter(percent > 0.15) %>% arrange(desc(percent))
+
+write.csv(missingValues,'deletecol_train.csv')
+```
+
+### EDA
+
+```{r}
+
+train_set_scale <- train_set_scale[,-1] # drop the index col
+dim(train_set_scale)# We have total of 90275 obs., 23 variables in training set.
+
+summary(train_set_scale)
+View(train_set_scale)
+
+```
+### Import Data
+```{r}
+train_set_clean <- read.csv('train_set_clean.csv', header = TRUE, stringsAsFactors = FALSE)
+```
+
+
+### EDA
+```{r}
+summary(train_set_clean)
+```
+### Devide Data into Training and Validation Sets
+```{r}
+set.seed(0)
+train <- sample(1:nrow(train_set_clean),nrow(train_set_clean)*0.7)
+test <- -train
+trainset <- train_set_clean[train,]
+logerr_train <- train_set_clean$logerror[train]
+```
+
+
+
+
+### Model1
+
+
+
+#### Random Forest
+```{r}
+names(train_set_clean)
+set.seed(0)
+rf.logerr <- randomForest()
+```
+
+
+
