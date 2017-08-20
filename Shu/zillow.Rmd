@@ -21,6 +21,7 @@ library(kknn)
 library(lubridate)
 library(ggthemes)
 library(data.table)
+library(caret)
 ```
 
 
@@ -135,7 +136,7 @@ dim(properties_clean) # The dataset after reducing the missing-value columns has
 'fullbathcnt' = 'bathroomcnt'
 
 ```{r}
-names(properties_clean)
+
 col_drop <- c("fips","calculatedbathnbr","finishedsquarefeet12","fullbathcnt")
 cl = properties_clean[ ,-which(colnames(properties_clean) %in% col_drop)]
 properties_clean <- cl
@@ -228,17 +229,57 @@ train_set$taxdelinquencyflag <- ifelse(train_set$taxdelinquencyflag == "",0,1)
 ```{r}
 write.csv(train_set,"train_set.csv",row.names=FALSE)
 train_set <- read.csv('train_set.csv',header = TRUE, stringsAsFactors = FALSE)
+
 ```
 
 
 
 
-### EDA
+### Devide data into categorical, numerical parts
 ```{r}
-train_set <- na.omit(train_set)
+categorical <- names(train_set[,sapply(train_set,class)=="integer"])
+
+
+categorical <- append(categorical,"rawcensustractandblock")
+categorical <- append(categorical, "bathroomcnt")
+categorical <- categorical[-3]
+categorical <- categorical[-13]
+
+numeric_ <- names(train_set)[-which(names(train_set) %in% categorical)]
+numeric_ <- numeric_[-8] # rm assessmentyear
+numeric_ <- numeric_[-c(4,5,10)] #rm "propertycountylandusecode","propertyzoningdesc","censustractandblock" 
+
+
+categorical <- append(categorical,"censustractandblock")
+
+
+
+categorical_set <- train_set[,categorical]
+numeric_set <- train_set[,numeric_]
+
+
+# rm na in categorical set
+
+numeric_set <- numeric_set[complete.cases(categorical_set),]
+
+categorical_set <- categorical_set[complete.cases(categorical_set),]
+
+# Impute missing values in numeric_set
+pre <- preProcess(numeric_set,method = "medianImpute")
+numeric_set <- predict(pre,numeric_set) 
+
+numeric_set <- scale(numeric_set)
+
+train_set <- cbind(numeric_set,categorical_set)
+#View(train_set)
 summary(train_set)
-hist(log(train_set$lotsizesquarefeet))
 ```
 
+```{r}
+
+write.csv(train_set, 'train_set_clean.csv',row.names = FALSE)
+
+
+```
 
 
