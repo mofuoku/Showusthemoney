@@ -194,7 +194,7 @@ hist(log(original_clean$calculatedfinishedsquarefeet))
 ```
 
 ```{r}
-plot(properties_clean$bathroomcnt,log(properties_clean$calculatedfinishedsquarefeet))
+#plot(properties_clean$bathroomcnt,log(properties_clean$calculatedfinishedsquarefeet))
 ```
 
 ```{r}
@@ -209,11 +209,12 @@ train_set <- left_join(date, properties_clean, by = c("parcelid"="parcelid"))
 dim(train_set) # 90275 obs., 28 variables
 ```
 ### Make transactiondate column as month object
-### Delete parcelid col
+### Delete parcelid col (we don't do this now)
 ```{r}
 month = month(train_set$year_month)
 train_set$transactiondate <- month
-train_set <- train_set[,-c(4,1)]
+# train_set <- train_set[,-c(4,1)]
+train_set <- train_set[,-c(4)]
 setnames(train_set, old=c("transactiondate"), new=c("month"))
 ```
 ### Dummy Variable Cols
@@ -242,21 +243,33 @@ categorical <- names(train_set[,sapply(train_set,class)=="integer"])
 
 categorical <- append(categorical,"rawcensustractandblock")
 categorical <- append(categorical, "bathroomcnt")
-categorical <- categorical[-3]
-categorical <- categorical[-13]
+
+
 
 numeric_ <- names(train_set)[-which(names(train_set) %in% categorical)]
-numeric_ <- numeric_[-8] # rm assessmentyear
-numeric_ <- numeric_[-c(4,5,10)] #rm "propertycountylandusecode","propertyzoningdesc","censustractandblock" 
 
+#numeric_ <- numeric_[-8] # rm assessmentyear
+numeric_ <- numeric_[-c(4,5,11)] #rm "propertycountylandusecode","propertyzoningdesc","censustractandblock" 
+
+numeric_ <- append(numeric_,"calculatedfinishedsquarefeet")
+categorical <- categorical[-3] # rm "calculatedfinishedsquarefeet"
+categorical <- categorical[-12] # rm assessmentyear
 
 categorical <- append(categorical,"censustractandblock")
-
-
+numeric_ <- numeric_[-2] # rm "bedroomcnt"
+numeric_ <- numeric_[-3] # rm "fireplaceflag"
+categorical <- append(categorical,"bedroomcnt")
+categorical <- append(categorical,"fireplaceflag")
 
 categorical_set <- train_set[,categorical]
 numeric_set <- train_set[,numeric_]
 
+
+# Impute missing values in numeric_set
+pre <- preProcess(numeric_set,method = "medianImpute")
+numeric_set <- predict(pre,numeric_set) 
+
+# numeric_set <- scale(numeric_set)
 
 # rm na in categorical set
 
@@ -264,20 +277,17 @@ numeric_set <- numeric_set[complete.cases(categorical_set),]
 
 categorical_set <- categorical_set[complete.cases(categorical_set),]
 
-# Impute missing values in numeric_set
-pre <- preProcess(numeric_set,method = "medianImpute")
-numeric_set <- predict(pre,numeric_set) 
-
-numeric_set <- scale(numeric_set)
-
 train_set <- cbind(numeric_set,categorical_set)
 #View(train_set)
-summary(train_set)
+
+train_set <- train_set[,c(8,1:7,9:24)]
+#summary(train_set)
+#View(train_set)
 ```
 
 ```{r}
 
-write.csv(train_set, 'train_set_clean.csv',row.names = FALSE)
+write.csv(train_set, 'train_set_nonscaled.csv',row.names = FALSE)
 
 
 ```
