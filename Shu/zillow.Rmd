@@ -42,7 +42,7 @@ sample <- read.csv('sample_submission.csv',header = TRUE, stringsAsFactors = FAL
 
 ### Sample Set
 ```{r}
-dim(train) # 2985217 obs., 7 variables
+dim(sample) # 90275 obs., 3 variables
 head(sample,5)
 colnames(sample) <- tolower(colnames(sample))
 sum(complete.cases(sample)) # no missing values
@@ -136,11 +136,9 @@ dim(properties_clean) # The dataset after reducing the missing-value columns has
 'fullbathcnt' = 'bathroomcnt'
 
 ```{r}
-
 col_drop <- c("fips","calculatedbathnbr","finishedsquarefeet12","fullbathcnt")
 cl = properties_clean[ ,-which(colnames(properties_clean) %in% col_drop)]
 properties_clean <- cl
-
 ```
 
 
@@ -186,19 +184,19 @@ properties_clean$bedroomcnt <- imputed.bedroomcnt
 
 # sum(is.na(properties_clean$calculatedfinishedsquarefeet))
 ```
-calculatedfinishedsquarefeet 
 
-It has a normal distribution, so it is not 'MNAR', but it is related the number of bathrooms or total sqft. We can impute missing values KNN.
+### roomcnt ( Total number of rooms in the principal residence)
+A large number of records in the roomcnt column is marked as "0". This does not make sense, so we impute missing values as "bathroomcnt + bedroomcnt + 1". According to the complete data in the roomcnt column, the roomcnt is 1 room more than the sum of bathroomcnt and bedroomcnt in average. 
 ```{r}
-hist(log(original_clean$calculatedfinishedsquarefeet))
-```
+completrm <- properties_clean[properties_clean$roomcnt!=0 & !is.na(properties_clean$roomcnt),]
+addnum <- completrm$roomcnt-completrm$bathroomcnt-completrm$bedroomcnt
+mean(addnum) # The average added number should be 1.
 
-```{r}
-#plot(properties_clean$bathroomcnt,log(properties_clean$calculatedfinishedsquarefeet))
-```
+# roomcnt Imputation (impute 0 for missing datas)
+properties_clean$roomcnt[is.na(properties_clean$roomcnt)]=0
+# change 0 to an appropriate number
+properties_clean$roomcnt[properties_clean$roomcnt == 0] <- properties_clean$bathroomcnt[properties_clean$roomcnt == 0] + properties_clean$bedroomcnt[properties_clean$roomcnt == 0] + 1
 
-```{r}
-#tds <- kknn(calculatedfinishedsquarefeet~., original_clean,original_clean[,-"calculatedfinishedsquarefeet"],k=10,distance=2)
 ```
 
 
@@ -226,44 +224,30 @@ train_set$fireplaceflag <- ifelse(train_set$fireplaceflag == "",0,1)
 train_set$taxdelinquencyflag <- ifelse(train_set$taxdelinquencyflag == "",0,1)
 ```
 
-
 ```{r}
 write.csv(train_set,"train_set.csv",row.names=FALSE)
 train_set <- read.csv('train_set.csv',header = TRUE, stringsAsFactors = FALSE)
 
 ```
-
-
-
-
 ### Devide data into categorical, numerical parts
 ```{r}
 categorical <- names(train_set[,sapply(train_set,class)=="integer"])
 
-
 categorical <- append(categorical,"rawcensustractandblock")
 categorical <- append(categorical, "bathroomcnt")
-
-
+categorical <- append(categorical, "roomcnt")
+categorical <- append(categorical,"censustractandblock")
+categorical <- categorical[-4] # rm "calculatedfinishedsquarefeet"
 
 numeric_ <- names(train_set)[-which(names(train_set) %in% categorical)]
 
 #numeric_ <- numeric_[-8] # rm assessmentyear
-numeric_ <- numeric_[-c(4,5,11)] #rm "propertycountylandusecode","propertyzoningdesc","censustractandblock" 
+numeric_ <- numeric_[-c(4,5)] #rm "propertycountylandusecode","propertyzoningdesc"
 
-numeric_ <- append(numeric_,"calculatedfinishedsquarefeet")
-categorical <- categorical[-3] # rm "calculatedfinishedsquarefeet"
-categorical <- categorical[-12] # rm assessmentyear
-
-categorical <- append(categorical,"censustractandblock")
-numeric_ <- numeric_[-2] # rm "bedroomcnt"
-numeric_ <- numeric_[-3] # rm "fireplaceflag"
-categorical <- append(categorical,"bedroomcnt")
-categorical <- append(categorical,"fireplaceflag")
+categorical <- categorical[-13] # rm assessmentyear
 
 categorical_set <- train_set[,categorical]
 numeric_set <- train_set[,numeric_]
-
 
 # Impute missing values in numeric_set
 pre <- preProcess(numeric_set,method = "medianImpute")
@@ -285,11 +269,27 @@ train_set <- train_set[,c(8,1:7,9:24)]
 #View(train_set)
 ```
 
+### Feature Eng
 ```{r}
+# number of properties per regionzip
+#num_prop_zip <- train_set %>%
+  #group_by(regionidzip) %>%
+  #summarise(numpropperzip = n())
 
+#train_set$numzip = num_prop_zip$numpropperzip[match(train_set_nonscaled$regionidzip,num_prop_zip$regionidzip)]
+
+# sqft per room
+train_set <- train_set %>%
+  mutate(sqftperrm = calculatedfinishedsquarefeet/roomcnt)
+
+# tax per sqft
+# We use taxvaluedollarcnt here.(The total tax assessed value of the parcel)
+train_set <- train_set %>%
+  mutate(taxpersqft = taxvaluedollarcnt/calculatedfinishedsquarefeet)
+```
+
+```{r}
 write.csv(train_set, 'train_set_nonscaled.csv',row.names = FALSE)
-
-
 ```
 
 
