@@ -129,3 +129,4 @@ aggregate(train_data.scaled01, by = list(cluster = clusters.average), median)
 par(mfrow = c(1, 1))
 plot(fit.average, hang = -1, main = "Dendrogram of Average Linkage\n5 Clusters")
 rect.hclust(fit.average, k = 3)
+

@@ -34,7 +34,8 @@ library(mgcv)
 library(nlme)
 library(lme4)
 library(ggpmisc)
-
+library(cluster)
+library(fpc)
 #################################################################################
 ###################### Step 1. DATA SET PREPARATION #############################
 ##-----------------------------------------------------------------------------##
@@ -86,7 +87,9 @@ important_feature
 ##### 1. Model, Predict, and Compare using LM method.
 #####    Generate the plot in PDF format. The plot contains information of comparison
 #####    result of slope, intercept, and R^2 value.
-model_8f_lm.predict = lm(logerror~(taxamount*structuretaxvaluedollarcnt*calculatedfinishedsquarefeet*lotsizesquarefeet/taxvaluedollarcnt/landtaxvaluedollarcnt)^100/(latitude*longitude), data=Data07)
+model_8f_lm.predict = lm(logerror~(taxamount*structuretaxvaluedollarcnt*calculatedfinishedsquarefeet*lotsizesquarefeet/taxvaluedollarcnt/landtaxvaluedollarcnt)^100/(latitude*longitude), data=test_data_04)
+names(train_data_04)
+
 predict_8f_lm=predict(model_8f_lm.predict, Data02, interval = "prediction") #Construct prediction invervals
 predict_8f_lm<-as.data.frame(predict_8f_lm)
 result_8f_lm=as.data.table(cbind(Data02[,1:2],'fit'=predict_8f_lm[,1]))
@@ -165,8 +168,13 @@ dev.off()
 ##### 1. Use AIC & BIC STEP function to find the unique but common features
 #####    had during transactions in OCT, NOV, and DEC. Then slecte features to
 #####    to modify the model.
-model10.empty = lm(logerror~1,data=Data_2016)
-model10.full = lm(logerror~.,data=Data_2016)
+train_data_04<-read.csv("../../train_set_nonscaled_02_K5.csv",header=TRUE)
+Data02<-as.data.frame(train_data_04)
+Data02 <- Data02 %>% select(-c(1,2))
+test_data_04 <- Data02 %>%  filter(logerror>-0.5 & logerror<=0.5)
+Data06 <- test_data_04 %>% sample_n(1000, replace = T)
+model10.empty = lm(logerror~1,data=Data06)
+model10.full = lm(logerror~.,data=Data06)
 scope10 = list(lower = formula(model10.empty), upper = formula(model10.full))
 
 forwardAIC10 = step(model10.empty, scope10, direction = "forward", k = 2)
@@ -174,10 +182,10 @@ backwardAIC10 = step(model10.full, scope10, direction = "backward", k = 2)
 bothAIC.empty10 = step(model10.empty, scope10, direction = "both", k = 2)
 bothAIC.full10 = step(model10.full, scope10, direction = "both", k = 2)
 
-forwardBIC10 = step(model10.empty, scope10, direction = "forward", k = log(nrow(Data02)))
-backwardBIC10 = step(model10.full, scope10, direction = "backward", k = log(nrow(Data02)))
-bothBIC.empty10 = step(model10.empty, scope10, direction = "both", k = log(nrow(Data02)))
-bothBIC.full10 = step(model10.full, scope10, direction = "both", k = log(nrow(Data02)))
+forwardBIC10 = step(model10.empty, scope10, direction = "forward", k = log(nrow(test_data_04)))
+backwardBIC10 = step(model10.full, scope10, direction = "backward", k = log(nrow(test_data_04)))
+bothBIC.empty10 = step(model10.empty, scope10, direction = "both", k = log(nrow(test_data_04)))
+bothBIC.full10 = step(model10.full, scope10, direction = "both", k = log(nrow(test_data_04)))
 
 summary(forwardAIC10)
 summary(backwardAIC10)
@@ -190,11 +198,17 @@ summary(bothBIC.full10)
 
 ##### 2. It finds five following features that can be added to modify the model.
 
-#  fireplaceflag                 7.279e-02  2.964e-02   2.456  0.01408 *  
-#  bathroomcnt                  -6.912e-03  2.580e-03  -2.679  0.00739 ** 
-#  propertylandusetypeid         6.654e-04  3.072e-04   2.166  0.03036 *  
-#  regionidzip                  -5.775e-07  3.429e-07  -1.684  0.09219 .  
-#  regionidcounty               -3.399e-06  2.077e-06  -1.637  0.10173    
+calculatedfinishedsquarefeet  0.0108358  0.0007928  13.668  < 2e-16 ***
+  taxamount                    -0.0175995  0.0010099 -17.426  < 2e-16 ***
+  taxvaluedollarcnt             0.0063197  0.0017312   3.651 0.000262 ***
+  taxdelinquencyflag            0.0027024  0.0003078   8.780  < 2e-16 ***
+  propertylandusetypeid         0.0009657  0.0003738   2.584 0.009778 ** 
+  hashottuborspa               -0.0019337  0.0003144  -6.150 7.77e-10 ***
+  month                         0.0013648  0.0003040   4.490 7.13e-06 ***
+  yearbuilt                     0.0019834  0.0003607   5.499 3.84e-08 ***
+  landtaxvaluedollarcnt         0.0063443  0.0012778   4.965 6.89e-07 ***
+  sqftperrm                    -0.0020870  0.0004428  -4.714 2.44e-06 ***
+  roomcnt                      -0.0024739  0.0006194  -3.994 6.50e-05 ***  
 
 ##-----------------------------------------------------------------------------##
 
@@ -207,9 +221,9 @@ summary(bothBIC.full10)
 
 model_lm_OCT.predict = lm(logerror~((calculatedfinishedsquarefeet+taxamount+taxvaluedollarcnt+hashottuborspa/regionidzip)+(bathroomcnt-taxdelinquencyflag*propertylandusetypeid*fireplaceflag))^1000, data=Data06)
 
-predict_lm_OCT=predict(model_lm_OCT.predict, Data02, interval = "prediction") #Construct prediction invervals
+predict_lm_OCT=predict(model_lm_OCT.predict, train_data_04, interval = "prediction") #Construct prediction invervals
 predict_lm_OCT<-as.data.frame(predict_lm_OCT)
-result_lm_OCT=as.data.table(cbind(Data02[,1:2],'fit'=predict_lm_OCT[,1]))
+result_lm_OCT=as.data.table(cbind(train_data_04[,1:2],'fit'=predict_lm_OCT[,1]))
 model_lm_OCT<-lm(fit~logerror,data=result_lm_OCT)
 summary(model_lm_OCT)
 
@@ -243,11 +257,23 @@ dev.off()
 #####    Generate the plot in PDF format. The plot contains information of comparison
 #####    result of slope, intercept, and R^2 value.
 
-model_OCT.predict = lme(logerror~calculatedfinishedsquarefeet+taxamount+taxvaluedollarcnt+taxdelinquencyflag+hashottuborspa+propertylandusetypeid+fireplaceflag+bathroomcnt+regionidzip, random=~1|calculatedfinishedsquarefeet/taxamount/taxvaluedollarcnt/taxdelinquencyflag/hashottuborspa/propertylandusetypeid/fireplaceflag/bathroomcnt/regionidzip, data=Data07,method="ML")
+calculatedfinishedsquarefeet  0.0108358  0.0007928  13.668  < 2e-16 ***
+  taxamount                    -0.0175995  0.0010099 -17.426  < 2e-16 ***
+  taxvaluedollarcnt             0.0063197  0.0017312   3.651 0.000262 ***
+  taxdelinquencyflag            0.0027024  0.0003078   8.780  < 2e-16 ***
+  propertylandusetypeid         0.0009657  0.0003738   2.584 0.009778 ** 
+  hashottuborspa               -0.0019337  0.0003144  -6.150 7.77e-10 ***
+  month                         0.0013648  0.0003040   4.490 7.13e-06 ***
+  yearbuilt                     0.0019834  0.0003607   5.499 3.84e-08 ***
+  landtaxvaluedollarcnt         0.0063443  0.0012778   4.965 6.89e-07 ***
+  sqftperrm                    -0.0020870  0.0004428  -4.714 2.44e-06 ***
+  roomcnt 
 
-predict_OCT=predict(model_OCT.predict, Data08, interval = "prediction") #Construct prediction invervals
+model_OCT.predict = lme(logerror~calculatedfinishedsquarefeet+taxamount+taxvaluedollarcnt+taxdelinquencyflag+hashottuborspa+propertylandusetypeid+bathroomcnt+regionidzip+hashottuborspa+landtaxvaluedollarcnt+level, random=~1|calculatedfinishedsquarefeet/taxamount/taxvaluedollarcnt/taxdelinquencyflag/hashottuborspa/propertylandusetypeid/bathroomcnt/regionidzip/hashottuborspa/landtaxvaluedollarcnt/level, data=Data06,method="ML")
+
+predict_OCT=predict(model_OCT.predict, Data02, interval = "prediction") #Construct prediction invervals
 predict_OCT<-as.data.frame(predict_OCT)
-result_OCT=as.data.table(cbind(Data08[,1:2],'fit'=predict_OCT[,1]))
+result_OCT=as.data.table(cbind(Data02[,1:2],'fit'=predict_OCT[,1]))
 dim(result_OCT)
 dim(Data02)
 model_OCT<-lm(fit~logerror,data=result_OCT)
@@ -359,3 +385,73 @@ se.lines<-function(model){
 #se.lines(model_8feature)
 dev.off()
 ##-----------------------------------------------------------------------------##
+names(train_data_01)
+train_data_00 = read.csv("../../train_set_nonscaled_01.csv",header=TRUE)
+data01_cluster <- kmeans(Data02[,2:10], 3, nstart=20)
+clusplot(Data02[,2:10], data01_cluster$cluster, color=TRUE, shade=TRUE, labels=2, lines=0)
+
+
+train_data_01<-train_data_00 %>%  select(-c(1,2))
+train_data_01<-as.data.frame(scale(train_data_01))
+train_data_00<-train_data_00 %>%  select(c(1,2))
+data_cluster <- kmeans(train_data_01, 5, nstart=20)
+
+levels<-data_cluster$cluster
+train_data_04 <- cbind(train_data_00,train_data_01, level=levels)
+write.csv(train_data_04,"../../train_set_nonscaled_02_K5.csv")
+View(train_data_04)
+
+train_data_03 <- train_data_04
+train_data_04 <- train_data_04 %>% select(-c(1))
+names(train_data_04)
+df<-data.table(train_data_04)
+sparse_matrix <- sparse.model.matrix(logerror ~ ., data = df)[,-1]
+output_vector = df[,logerror] == "Marked"
+
+bst <- xgboost(data = test_data_04, label = train_data_04, nrounds = 25, objective = "binary:logistic")
+
+, max_depth = 4,
+                             eta = 1, nthread = 2, nrounds = 100,objective = "binary:logistic")
+importance <- xgb.importance(feature_names = colnames(sparse_matrix), model = bst)
+head(importance)
+
+y_pred <- predict(bst, sparse_matrix)
+names <- dimnames(sparse_matrix)[[2]]
+bst.plot.importance(importance_matrix[1:10,])
+model <- xgb.dump(xgb, with.stats = T)
+importance <- xgb.importance(feature_names = colnames(sparse_matrix), model = bst)
+head(importance)
+
+importanceRaw <- xgb.importance(feature_names = colnames(sparse_matrix), model = bst, data = sparse_matrix, label = output_vector)
+
+importanceClean <- importanceRaw[,`:=`(Cover=NULL, Frequency=NULL)]
+
+head(importanceClean)
+
+xgb.plot.importance(importance_matrix = importance)
+
+
+install.packages('xgboost')
+library(xgboost)
+install.packages('readr')
+library(readr)
+library(stringr)
+library(caret)
+library(car)
+library(Matrix)
+install.packages('drat')
+library(drat)
+
+names(train_data_04)
+
+#clusplot(train_data_02, data01_cluster$cluster, color=TRUE, shade=TRUE, labels=2, lines=0)
+#dim(train_data_02)
+#medians = apply(train_data_02,2,median)
+#mads = apply(train_data_02,2,mad)
+#train_data_02 = scale(train_data_02,center=medians,scale=mads)
+#h = (nrow(train_data_02))-1
+#train_data.dist = dist(train_data_02)
+#train_data.hclust = hclust(train_data.dist,method="complete")
+#?hclust
+#plot(train_data.hclust,labels=train_data_02$yearbuilt,main='Default from hclust')
+

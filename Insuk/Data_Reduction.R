@@ -4,7 +4,7 @@
 ## The parameter "logerror" defines the log of ratio of estiamted price by Zillow to the actual 
 ## price. 
 
-train_data = read.csv("train_2016_v2.csv",header=TRUE)
+train_data = read.csv("../../train_2016_v2.csv",header=TRUE)
 View(train_data)
 library(tidyr)
 library(dplyr)
@@ -73,7 +73,7 @@ train_data3 %>% filter(logerror>=log10(0.8) & logerror<=log10(1.2)) %>% select(p
 
 ####################################################################################################
 library(data.table)
-property_data = fread("properties_2016.csv",header=TRUE,sep=',')
+property_data = fread("../../properties_2016.csv",header=TRUE,sep=',')
 View(property_data)
 
 ### property data contains 58 columns and there are only 5 parameters that do not have 
@@ -98,4 +98,8 @@ property_data_13 <- cbind(property_data_01,property_data_04)
 
 data01 <- inner_join(train_data3,property_data_11)
 data02 <- inner_join(train_data3,property_data_12)
-data02 <- inner_join(train_data3,property_data_13)
+data03 <- inner_join(train_data3,property_data_13)
+
+data01_cluster <- kmeans(data01[,2:20], 3, nstart=20)
+
+
